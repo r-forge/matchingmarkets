@@ -42,7 +42,7 @@
 #' Here, \eqn{V} is a vector of latent valuations of \emph{all feasible} matches, ie observed and 
 #' unobserved, and \eqn{1[.]} is the Iverson bracket. 
 #' A match is observed if its match valuation is in the set of valuations \eqn{\Gamma}
-#' that satisfy the equilibrium condition (see Klein, 2014). This condition differs for matching
+#' that satisfy the equilibrium condition (see Klein, 2015a). This condition differs for matching
 #' games with transferable and non-transferable utility and can be specified using the \code{method} 
 #' argument. 
 #' The match valuation \eqn{V} is a linear function of \eqn{W}, a matrix of characteristics for 
@@ -181,7 +181,7 @@
 #' 
 #' @keywords regression
 #' 
-#' @references Klein, T. (2014). Stable matching in microcredit: Implications for market design & econometric analysis, PhD thesis, 
+#' @references Klein, T. (2015a). Stable matching in microcredit: Implications for market design & econometric analysis, PhD thesis, 
 #' \emph{University of Cambridge}.
 #' @references Zellner, A. (1986). \emph{On assessing prior distributions and Bayesian regression analysis with g-prior distributions}, 
 #' volume 6, pages 233--243. North-Holland, Amsterdam.
@@ -236,16 +236,21 @@
 #' ## 3. Get results
 #'  names(fit1)
 #' 
-#' ## --- REPLICATION, Klein (2014), Table 8 ---
+#' ## --- REPLICATION, Klein (2015a) ---
 #' ## 1. Load data 
-#'  data(baac00)
-#' ## 2. Run Gibbs sampler
-#'  fit2 <- stabit(x=baac00, selection = list(add="pi",int="pi",ive="occ",ieq="wst"), 
-#'         outcome = list(add="pi",int="pi",ive="occ",ieq="wst",
-#'         add=c("loan_size","loan_size2","lngroup_agei")), 
-#'         method="NTU", binary=TRUE, gPrior=TRUE, marketFE=TRUE, niter=2000)
-#' ## 3. Get results
-#'  names(fit2)
+#'  data(baac00); head(baac00)
+#' ## 2. standardise variables
+#'  baac00$pi <- baac00$pi + (1-baac00$pi)*0.5
+#'  baac00$loan_size <- baac00$loan_size/sd(baac00$loan_size)
+#'  baac00$loan_size2 <- baac00$loan_size^2
+#'  baac00$lngroup_agei <- baac00$lngroup_agei/sd(baac00$lngroup_agei)
+#' ## 3. Run Gibbs sampler
+#'  klein15a <- stabit(x=baac00, selection = list(inv="pi",ieq="wst"), 
+#'         outcome = list(add="pi",inv="pi",ieq="wst",
+#'         add=c("loan_size","loan_size2","lngroup_agei")), offsetOut=1,
+#'         method="NTU", binary=TRUE, gPrior=TRUE, marketFE=TRUE, niter=800000)
+#' ## 4. Get results
+#'  mfx(klein15a)
 #' }
 stabit <- function(x, m.id="m.id", g.id="g.id", R="R", selection=NULL, outcome=NULL, 
                    roommates=FALSE, simulation="none", seed=123, max.combs=Inf,
@@ -1289,7 +1294,9 @@ designmatrix <- function(selection, outcome, x, roommates=FALSE, simulation=FALS
     
     ## standardize variance of exogneous variables to 1
     std <- apply(do.call(rbind, data.combs), 2, sd)
-    data.combs <- lapply(data.combs, function(i) as.data.frame(t(apply(i,1,function(j) j/(standardize*std)) )))
+    for(i in 1:numvills){
+      data.combs[[i]] <- data.combs[[i]] / (standardize*std)
+    }
     
   }
   
@@ -1429,19 +1436,29 @@ designmatrix <- function(selection, outcome, x, roommates=FALSE, simulation=FALS
           
           ## Swap groups at position 1 and 2 with equilibrium groups equ1 and equ2
           if(sum(equ1,equ2)!=3){ ## otherwise (equ1, equ2) are already in position (1,2)
-            data.combs[[i]] <- rbind( data.combs[[i]][c(equ1,equ2),], 
-                                      data.combs[[i]][1,], data.combs[[i]][(3:(l/2+1))[-(min(equ1,equ2)-2)],], 
-                                      data.combs[[i]][2,], data.combs[[i]][((l/2+2):l)[-(min(equ1,equ2)-2)],] )
+            #data.combs[[i]] <- rbind( data.combs[[i]][c(equ1,equ2),], 
+            #                          data.combs[[i]][1,], data.combs[[i]][(3:(l/2+1))[-(min(equ1,equ2)-2)],], 
+            #                          data.combs[[i]][2,], data.combs[[i]][((l/2+2):l)[-(min(equ1,equ2)-2)],] )
+            nvars <- length(vars)
+            data.combs[[i]][1:dim(data.combs[[i]])[1],] <- rbind( as.matrix( data.combs[[i]][c(equ1,equ2),], ncol=nvars), 
+                                      data.combs[[i]][1,], 
+                                      as.matrix( data.combs[[i]][(3:(l/2+1))[-(min(equ1,equ2)-2)],], ncol=nvars), 
+                                      data.combs[[i]][2,], 
+                                      as.matrix( data.combs[[i]][((l/2+2):l)[-(min(equ1,equ2)-2)],], ncol=nvars) )
+            #colnames(data.combs[[i]]) <- vars
+            #colnames(data.combs[[i]]) <- gsub("@",".",names(data.combs[[i]]))
+            
             V[[i]]          <- c( V[[i]][c(equ1,equ2)], 
                                   V[[i]][1], V[[i]][(3:(l/2+1))[-(min(equ1,equ2)-2)]], 
                                   V[[i]][2], V[[i]][((l/2+2):l)[-(min(equ1,equ2)-2)]] )
+            
             eta[[i]]        <- c( eta[[i]][c(equ1,equ2)], 
                                   eta[[i]][1], eta[[i]][(3:(l/2+1))[-(min(equ1,equ2)-2)]], 
                                   eta[[i]][1], eta[[i]][((l/2+2):l)[-(min(equ1,equ2)-2)]] )
           }
           xi[[i]]      <- xi[[i]][c(equ1,equ2)]
           epsilon[[i]] <- epsilon[[i]][c(equ1,equ2)]
-          R[[i]] <- apply(data.combs[[i]][1:2,], 1, sum) + epsilon[[i]]
+          R[[i]] <- -1*apply(as.matrix( data.combs[[i]][1:2,], nrow=2), 1, sum) + epsilon[[i]]
           #R[[i]] <- ifelse(R[[i]] > 1, 1, 0) # uncomment me!
           
           E[[i]] <- thiscmat[c(equ1,equ2),]
@@ -1454,7 +1471,7 @@ designmatrix <- function(selection, outcome, x, roommates=FALSE, simulation=FALS
           delta        <- 0.5
           epsilon[[i]] <- delta*eta[[i]] + xi[[i]]
           
-          R[[i]] <- apply(data.combs[[i]][1,], 1, sum) + epsilon[[i]]
+          R[[i]] <- sum(data.combs[[i]]) + epsilon[[i]]
           
         }
       }
@@ -1485,14 +1502,24 @@ designmatrix <- function(selection, outcome, x, roommates=FALSE, simulation=FALS
     
   } else{
     
-    W <- lapply(1:dim(spec)[1], function(i) data.combs[[i]][,W.names])
+    W <- lapply(1:dim(spec)[1], function(i){
+      h <- as.data.frame(data.combs[[i]][,W.names])
+      names(h) <- W.names
+      h
+    })
+    
     X <- lapply(1:length(data.combs), function(i){ 
       if(i <= dim(spec)[1]){
-        data.combs[[i]][1:2,X.names]
+        h <- as.data.frame(data.combs[[i]][1:2,X.names])
+        names(h) <- X.names
+        h
       } else{
-        data.combs[[i]][,X.names]
+        h <- as.data.frame(data.combs[[i]][,X.names])
+        names(h) <- X.names
+        h
       }
     })
+    
     return(list(D=D, R=R, W=W, X=X, V=V, P=P, epsilon=epsilon, eta=eta, xi=xi, combs=combs, E=E))
   }
 }
