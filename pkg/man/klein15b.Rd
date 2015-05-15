@@ -66,18 +66,21 @@ for(i in seq(1,length(klein15b)-1,2)){
   ntu <- ntu[,colnames(ntu) %in% c("alpha","beta.wst.ieq","delta")]
   ols <- ols[,colnames(ols) == "beta.wst.ieq"]
   
-  plot(density(ntu[,1],bw="SJ"), xlab=expression(hat(alpha)), ylab="density", main="", axes=FALSE, xlim=c(-1,2))
+  plot(density(ntu[,1],bw="SJ"), xlab=expression(hat(alpha)), 
+    ylab="density", main="", axes=FALSE, xlim=c(-1,2))
   axis(2,lwd=2,cex.axis=0.8); axis(1,lwd=2,cex.axis=0.8)
   legend("topleft","Struct.",lty=1,bty="n")
   abline(v=1, lty=3)
   
-  plot(density(ntu[,2],bw="SJ"), xlab=expression(hat(beta)), ylab="density", main=tpe[i], axes=FALSE)
+  plot(density(ntu[,2],bw="SJ"), xlab=expression(hat(beta)), 
+    ylab="density", main=tpe[i], axes=FALSE)
   axis(2,lwd=2,cex.axis=0.8); axis(1,lwd=2,cex.axis=0.8)
   points(density(ols,bw="SJ"), type="l", lty=2)
   legend("topright",c("Struct.","OLS"),lty=c(1,2),bty="n")
   abline(v=-1, lty=3)
   
-  plot(density(ntu[,3],bw="SJ"), xlab=expression(hat(delta)), ylab="density", main="", axes=FALSE)
+  plot(density(ntu[,3],bw="SJ"), xlab=expression(hat(delta)), 
+    ylab="density", main="", axes=FALSE)
   axis(2,lwd=2,cex.axis=0.8); axis(1,lwd=2,cex.axis=0.8)
   legend("topleft","Struct.",lty=1,bty="n")
   abline(v=0.5, lty=3)
