@@ -5,7 +5,8 @@ Depends:
 Imports:
     Rcpp (>= 0.11.2),
     lpSolve (>= 5.6.6),
-    partitions
+    partitions,
+    stats
 LinkingTo: Rcpp, RcppArmadillo, RcppProgress (>= 0.2)
 Title: Structural Estimators and Algorithms for the Analysis of Stable Matchings
 Author: Thilo Klein
