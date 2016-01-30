@@ -5,3 +5,6 @@ Meta/
 help/
 html/
 libs/
+\.o$
+\.so$
+\.dll$
