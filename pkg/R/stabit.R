@@ -124,7 +124,7 @@
 #' volume 6, pages 233--243. North-Holland, Amsterdam.
 #' 
 #' @examples
-#' 
+#' \dontrun{
 #' ## --- SIMULATED EXAMPLE ---
 #' 
 #' ## 1. Simulate one-sided matching data for 200 markets (m=200) with 2 groups
@@ -179,7 +179,6 @@
 #'  plot(fit1)
 #' 
 #' 
-#' \dontrun{
 #' ## --- REPLICATION, Klein (2015a) ---
 #' 
 #' ## 1. Load data 
