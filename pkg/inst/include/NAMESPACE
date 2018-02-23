@@ -1,6 +1,0 @@
-useDynLib(HRIC, .registration=TRUE)
-exportPattern("^[[:alpha:]]+")
-importFrom(Rcpp, evalCpp)
-
-S3method(hric,default)
-S3method(summary,hric)
