@@ -141,7 +141,8 @@ class DoubleOption : public Option
             return false;
 
         char*  end;
-        double tmp = strtod(span, &end);
+        //SVEN
+        //double tmp = strtod(span, &end);
         
         if (end == NULL) 
             return false;
@@ -201,7 +202,7 @@ class IntOption : public Option
             return false;
 
         char*   end;
-        int32_t tmp = strtol(span, &end, 10);
+        //int32_t tmp = strtol(span, &end, 10);
 
         if (end == NULL) 
             return false;
@@ -215,7 +216,7 @@ class IntOption : public Option
             exit(1); }
          */
 
-        value = tmp;
+        //value = tmp;
 
         return true;
     }
@@ -268,7 +269,8 @@ class Int64Option : public Option
             return false;
 
         char*   end;
-        int64_t tmp = strtoll(span, &end, 10);
+        //SVEN
+        //int64_t tmp = strtoll(span, &end, 10);
 
         if (end == NULL) 
             return false;
@@ -280,7 +282,7 @@ class Int64Option : public Option
             fprintf(stderr, "ERROR! value <%s> is too small for option \"%s\".\n", span, name);
             exit(1); }
         */
-        value = tmp;
+        //value = tmp;
 
         return true;
     }

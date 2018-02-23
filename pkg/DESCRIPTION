@@ -35,5 +35,5 @@ Description: Implements structural estimators to correct for
 URL: http://matchingMarkets.org,
     http://klein.uk
 BugReports: https://github.com/thiloklein/matchingMarkets/issues
-License: GPL (>= 2) | file LICENSE
+License: GPL (>= 2)
 RoxygenNote: 6.0.1
