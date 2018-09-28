@@ -6,8 +6,8 @@
 #
 # ----------------------------------------------------------------------------
 #
-#' @title Matching in the hospital/residents problem with couples
-#' @description Implements the Roth Peranson matching algorithm for the \href{https://en.wikipedia.org/wiki/National_Resident_Matching_Program}{hospital/residents problem with couples} as described in Roth and Peranson (1999). The function is based on a adoption of Fahiem Bacchus's \href{https://github.com/aperrau/stable-matching-suite}{stable-matching-suite}.
+#' @title Resident-optimal matching in the hospital/residents problem with couples
+#' @description Implements the Roth Peranson matching algorithm for the \href{https://en.wikipedia.org/wiki/National_Resident_Matching_Program}{hospital/residents problem with couples} as described in Roth and Peranson (1999). The function is based on an adoption of Bacchus (2018). 
 #' @param nStudents integer indicating the number of students (in the college admissions problem) 
 #' or men (in the stable marriage problem) in the market. Defaults to \code{ncol(s.prefs)}.
 #' @param nColleges integer indicating the number of colleges (in the college admissions problem) 
@@ -25,6 +25,7 @@
 #' @param co.prefs matrix of dimension \code{4} \code{x} \code{nCouplesPrefs} in long format with the \code{1}th and \code{2}th
 #' columns containing student couple id's; \code{3}th and \code{4}th is a 2-tuple ranking over college preference for the couple (coupleStudent1.pref, coupleStudent2.pref) in decreasing order of 
 #' preference by rows (i.e. most preferred first).
+#' @param randomization determines at which level and in which order random lottery numbers for student priorities are drawn. The default is \code{randomization = "multiple"}, where a student's priority is determined by a separate lottery at each college (i.e. local tie-breaking). For the second variant, \code{randomization = "single"}, a single lottery number determines a student's priority at all colleges (i.e. global tie breaking). A third variant is common in the context of course allocation, where a "couple" represents a student who submits a preference ranking over single courses (first course) and combinations of courses (first and second course). Here, the option \code{randomization = "single-course-first"} gives applications for a student's single courses strictly higher priority than for course combinations. This ensures the fairness criterion that a student is only assigned a second course after single course applications of all students have been considered.
 #' @param seed integer setting the state for random number generation. 
 #' @param ... .
 #' 
@@ -44,14 +45,16 @@
 #' 
 #' @return
 #' \code{hri2} returns a list of the following elements:
-#' \item{matchings}{list of matched students and colleges.}
-#' \item{summary}{detailed report of the matching result, including futher information on ranks. See function: summary.hrci(x)}
+#' \item{matchings}{List of matched students and colleges.}
+#' \item{summary}{Detailed report of the matching result, including futher information on ranks.}
 #' 
 #' @author Sven Giegerich, Thilo Klein 
 #' 
 #' @keywords algorithms, matching
 #' 
-#' @references Gale, D. and L.S. Shapley (1962). College admissions and the stability 
+#' @references Bacchus, F. (2018). Stable matching suite. GitHub repository.
+#' 
+#' Gale, D. and L.S. Shapley (1962). College admissions and the stability 
 #' of marriage. \emph{The American Mathematical Monthly}, 69(1):9--15.
 #' 
 #' Roth, A. E., & Peranson, E. (1999). The redesign of the matching market for American physicians: Some engineering aspects of economic design. \emph{American economic review}, 89(4), 748-780.
@@ -59,29 +62,29 @@
 #' Kojima, F., Pathak, P. A., & Roth, A. E. (2013). Matching with couples: Stability and incentives in large markets. \emph{The Quarterly Journal of Economics}, 128(4), 1585-1632.
 #' 
 #' @examples
-#' # Example I
-#' s.prefs <- matrix(c(4,2,3,5,1, 2,1,3,4,5, 1,2,3,4,5), 5,3)
-#' c.prefs <- matrix(c(1,2,3, 1,2,3, 1,2,3, 1,2,3, 1,2,3), 3,5)
-#' co.prefs <- matrix(c(4,4,4,4,4,4,4,4,5,5,5,5,5,5,5,5, 1,2,1,2,3,3,4,3, 1,1,2,2,2,3,3,4), 8,4)
-#' res <- hri2(s.prefs=s.prefs, c.prefs=c.prefs, co.prefs=co.prefs, nSlots=c(1,1,1,1,1))
+#' ## Example with given preferences
+#' (s.prefs <- matrix(c(4,2,3,5, 2,1,3,NA, 1,2,3,4), 4,3))
+#' (c.prefs <- matrix(rep(1:5,5), 5,5))
+#' (co.prefs <- matrix(c(rep(4,3), rep(5,3), 3,3,NA, 3,NA,3), 3,4))
+#' res <- hri2(s.prefs=s.prefs, c.prefs=c.prefs, co.prefs=co.prefs, nSlots=rep(1,5))
 #' res$matchings
-#' #summary(res)
+#' # summary(res)
 #' 
-#' # Example II
+#' ## Example with random preferences
 #' nStudents <- 50
 #' nColleges <- 30
 #' nCouples <- 4
 #' nSlots <- sample(1:nStudents, nColleges)
 #' res <- hri2(nStudents=nStudents, nColleges=nColleges, nCouples=nCouples, nSlots=nSlots)
 #' res$matchings
-#' #summary(res)
+#' # summary(res)
 
 hri2 <- function(nStudents=ncol(s.prefs), nColleges=ncol(c.prefs), nSlots=rep(1,nColleges), nCouples=ncol(co.prefs), 
-                  s.prefs=NULL, c.prefs=NULL, co.prefs=NULL, seed=NULL, ...) UseMethod("hri2")
+                  s.prefs=NULL, c.prefs=NULL, co.prefs=NULL, randomization="multiple", seed=NULL, ...) UseMethod("hri2")
 
 #' @export
 hri2.default <- function(nStudents=ncol(s.prefs), nColleges=ncol(c.prefs), nSlots=rep(1,nColleges), nCouples=ncol(co.prefs), 
-                        s.prefs=NULL, c.prefs=NULL, co.prefs=NULL, seed=NULL, ...){
+                        s.prefs=NULL, c.prefs=NULL, co.prefs=NULL, randomization="multiple", seed=NULL, ...){
   
   ## -------------------------------------------------------
   ## --- 1. consistency checks:  ---------------------------
@@ -117,8 +120,21 @@ hri2.default <- function(nStudents=ncol(s.prefs), nColleges=ncol(c.prefs), nSlot
   if(is.null(s.prefs)){  
     s.prefs <- replicate(n=nStudents,sample(seq(from=1,to=nColleges,by=1)))
   }
-  if(is.null(c.prefs)){    
-    c.prefs <- replicate(n=nColleges,sample(seq(from=1,to=nStudents+2*nCouples,by=1)))
+  if(is.null(c.prefs)){  
+    if(randomization == "single"){ 
+      
+      c.prefs <- matrix(sample(seq(from=1, to=nStudents+2*nCouples, by=1)), nrow=nStudents+2*nCouples, ncol=nColleges) 
+
+    } else if(randomization == "single-course-first"){
+      
+      c.prefs <- matrix( c(sample(c(1:nStudents, seq(nStudents+1, nStudents+2*nCouples, by=2))), 
+                 sample(seq(nStudents+2, nStudents+2*nCouples, by=2))),
+                 nrow=nStudents+2*nCouples, ncol=nColleges)
+      
+    } else{ # if(randomization == "multiple")
+      
+      c.prefs <- replicate(n=nColleges ,sample(seq(from=1, to=nStudents+2*nCouples, by=1))) 
+    }
   }
   if(is.null(co.prefs) && nCouples > 0){
     co.prefs <- matrix(ncol = nCouples, nrow = 2+2*nColleges)
@@ -146,10 +162,10 @@ hri2.default <- function(nStudents=ncol(s.prefs), nColleges=ncol(c.prefs), nSlot
   ## --- 3. Prepare preference matrices and apply solver ---
   
   ## prepare and write preference matrices
-  c.matrix <- sapply(1:nrow(t(c.prefs)), function(z) paste("p", z - 1, if(is.na(nSlots[z])){"0"} else{nSlots[z]}, paste( t(c.prefs)[z,][!is.na(t(c.prefs)[z,])] -1, collapse = " ")))
-  s.matrix <- sapply(1:nrow(t(s.prefs)), function(z) paste("r", z - 1, paste( t(s.prefs)[z,][!is.na(t(s.prefs)[z,])] -1, collapse = " ")))
+  c.matrix <- sapply(1:ncol(c.prefs), function(z) paste("p", z - 1, if(is.na(nSlots[z])){"0"} else{nSlots[z]}, paste( t(c.prefs)[z,][!is.na(t(c.prefs)[z,])] -1, collapse = " ")))
+  s.matrix <- sapply(1:ncol(s.prefs), function(z) paste("r", z - 1, paste( t(s.prefs)[z,][!is.na(t(s.prefs)[z,])] -1, collapse = " ")))
   if (nCouples > 0) {
-    co.matrix <- sapply(1:nrow(co.prefs), function(z) paste("c", z - 1, paste(co.prefs[z,][!is.na(t(co.prefs)[z,])] -1, collapse = " ")))
+    co.matrix <- sapply(1:nrow(co.prefs), function(z) paste("c", z - 1, paste(co.prefs[z,][!is.na(co.prefs[z,])] -1, collapse = " ")))
   } else {
     co.matrix <- c("")
   }
@@ -157,7 +173,10 @@ hri2.default <- function(nStudents=ncol(s.prefs), nColleges=ncol(c.prefs), nSlot
   matchResult <- runMatch(s.matrix, c.matrix, co.matrix)
   
   matchResult$matchings <- cbind(matchResult$matchings$ResidentID, matchResult$matchings$matchResultResident)
-  colnames(matchResult$matchings) <- c("resident", "match")
+  colnames(matchResult$matchings) <- c("student", "college")
+  
+  ## drop unmatched students and colleges
+  matchResult$matchings <- matchResult$matchings[(matchResult$matchings[,1] != 0) & (matchResult$matchings[,2] != 0),]
   
   class(matchResult) <- "hri2"
   return(matchResult)
