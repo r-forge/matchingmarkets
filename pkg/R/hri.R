@@ -40,6 +40,7 @@
 #' @param c.range range of two intergers \code{c.range = c(c.min, c.max)}, where \code{c.min < c.max}. 
 #' Produces incomplete preference lists with the length of each college's list randomly sampled from 
 #' the range \code{[c.min, c.max]}. Note: interval is only correct if either c.range or s.range is used.
+#' @param randomization determines at which level random lottery numbers for student priorities are drawn. The default is \code{randomization = "multiple"}, where a student's priority is determined by a separate lottery at each college (i.e. local tie-breaking). For the second variant, \code{randomization = "single"}, a single lottery number determines a student's priority at all colleges (i.e. global tie breaking). 
 #' @param ... .
 #' 
 #' @export
@@ -67,7 +68,7 @@
 #' (\code{matching}) and two variables that indicate the student-optimal match (\code{sOptimal}) and 
 #' college-optimal match (\code{cOptimal})}.
 #' 
-#' @author Thilo Klein 
+#' @author Thilo Klein
 #' 
 #' @keywords algorithms
 #' 
@@ -84,12 +85,19 @@
 #' ## -----------------------
 #' ## --- Marriage problem 
 #' 
-#' ## 3 men, 2 women, random preferences:
+#' ## 7 men, 6 women, random preferences:
 #'  hri(nStudents=7, nColleges=6, seed=4)
 #' 
 #' ## 3 men, 2 women, given preferences:
 #'  s.prefs <- matrix(c(1,2, 1,2, 1,2), 2,3)
 #'  c.prefs <- matrix(c(1,2,3, 1,2,3), 3,2)
+#'  hri(s.prefs=s.prefs, c.prefs=c.prefs)
+#' 
+#' ## 3 men, 2 women, given preferences:
+#'  s.prefs <- matrix(c("x","y", "x","y", "x","y"), 2,3)
+#'  colnames(s.prefs) <- c("A","B","C")
+#'  c.prefs <- matrix(c("A","B","C", "A","B","C"), 3,2)
+#'  colnames(c.prefs) <- c("x","y")
 #'  hri(s.prefs=s.prefs, c.prefs=c.prefs)
 #' 
 #' ## --------------------------------
@@ -103,26 +111,38 @@
 #'  c.prefs <- matrix(c(1,2,3,4,5,6,7, 1,2,3,4,5,NA,NA), 7,2)
 #'  hri(s.prefs=s.prefs, c.prefs=c.prefs, nSlots=c(3,3))
 #'  
+#' ## 7 students, 2 colleges with 3 slots each, given preferences:
+#'  s.prefs <- matrix(c("x","y", "x","y", "x",NA, "x","y", 
+#'                      "x","y", "x","y", "x","y"), 2,7)
+#'  colnames(s.prefs) <- c("A","B","C","D","E","F","G")
+#'  c.prefs <- matrix(c("A","B","C","D","E","F","G", 
+#'                      "A","B","C","D","E",NA,NA), 7,2)
+#'  colnames(c.prefs) <- c("x","y")
+#'  hri(s.prefs=s.prefs, c.prefs=c.prefs, nSlots=c(3,3))
+#'  
 #' ## 7 students, 3 colleges with 3 slots each, incomplete preferences:
 #'  hri(nStudents=7, nSlots=c(3,3,3), seed=21, s.range=c(1,3))
 #'  
 #' ## --------------------
 #' ## --- Summary plots
-#' \dontrun{
+#' 
 #' ## 200 students, 200 colleges with 1 slot each
 #'  res <- hri(nStudents=200, nColleges=200, seed=12)
 #'  plot(res)
 #'  plot(res, energy=TRUE)
-#'  }
+#'  
 hri <- function(nStudents=ncol(s.prefs), nColleges=ncol(c.prefs), nSlots=rep(1,nColleges), 
-                s.prefs=NULL, c.prefs=NULL, seed=NULL, s.range=NULL, c.range=NULL, ...) UseMethod("hri")
+               s.prefs=NULL, c.prefs=NULL, s.range=NULL, c.range=NULL, randomization=NULL, seed=NULL, ...) UseMethod("hri")
 
 #' @export
 hri.default <- function(nStudents=ncol(s.prefs), nColleges=ncol(c.prefs), nSlots=rep(1,nColleges), 
-                s.prefs=NULL, c.prefs=NULL, seed=NULL, s.range=NULL, c.range=NULL, ...){
-  
+                       s.prefs=NULL, c.prefs=NULL, s.range=NULL, c.range=NULL, randomization='multiple', seed=NULL, ...){
+
+  ###############################################################  
+  #print('Section 1a')
+  #print(Sys.time())
   ## ------------------------
-  ## --- 1. Preliminaries ---
+  ## --- 1-a. Preliminaries ---
   
   ## set seed for random preference draws
   if(!is.null(seed)){
@@ -138,8 +158,15 @@ hri.default <- function(nStudents=ncol(s.prefs), nColleges=ncol(c.prefs), nSlots
   if(is.null(s.prefs)){  
     s.prefs <- replicate(n=nStudents,sample(seq(from=1,to=nColleges,by=1)))
   }
-  if(is.null(c.prefs)){    
-    c.prefs <- replicate(n=nColleges,sample(seq(from=1,to=nStudents,by=1)))
+  if(is.null(c.prefs)){   
+    if(randomization == "single"){ 
+      
+      c.prefs <- matrix(sample(seq(from=1, to=nStudents, by=1)), nrow=nStudents, ncol=nColleges) 
+      
+    } else{ # if(randomization == "multiple")
+      
+      c.prefs <- replicate(n=nColleges, sample(seq(from=1, to=nStudents, by=1)))
+    }
   }
   
   ## consistency checks:
@@ -152,43 +179,161 @@ hri.default <- function(nStudents=ncol(s.prefs), nColleges=ncol(c.prefs), nSlots
     stop("Length of 'nSlots' must equal 'nColleges' and the number of columns of 'c.prefs'!")
   }
   
+  #print('Section 1b')
+  #print(Sys.time())
+  ## ---------------------------------------------------
+  ## --- 1-b. Replace college/student names with ids ---
+  
+  #s.prefs <- matrix(c("1","2", "1","2", "1","2"), 2,3); colnames(s.prefs) <- c("A","B","C")
+  #c.prefs <- matrix(c("A","B","C", "A","B","C"), 3,2);  colnames(c.prefs) <- c("1","2")
+  
+  ## add colnames index to s.prefs and c.prefs if colnames are NULL 
+  if(is.null(colnames(s.prefs))){
+    colnames(s.prefs) <- 1:ncol(s.prefs)
+  }
+  if(is.null(colnames(c.prefs))){
+    colnames(c.prefs) <- 1:ncol(c.prefs)
+  }
+
+  ###############################################################  
+  #print('Section 2a')
+  #print(Sys.time())
   ## ---------------------------------------------------------
-  ## --- 2. Incomplete preferences (and consistency check) ---
+  ## --- 2-a. Incomplete preferences (and consistency check) ---
+  
+  c.names <- colnames(c.prefs)
+  s.names <- colnames(s.prefs)
   
   ## make complete preference lists incomplete
   if(!is.null(s.range)){
     #s.range <- c(s.min, nrow(s.prefs))
     thre.s <- sample(x=s.range[1]:s.range[2], size=ncol(s.prefs), replace=TRUE)
     s.prefs <- sapply(1:ncol(s.prefs), function(z) c(s.prefs[1:thre.s[z],z], rep(NA,nrow(s.prefs)-thre.s[z])) )
+    colnames(s.prefs) <- s.names
+    rownames(s.prefs) <- NULL
   }
   if(!is.null(c.range)){
     #c.range <- c(c.min, nrow(c.prefs))
     thre.c <- sample(x=c.range[1]:c.range[2], size=ncol(c.prefs), replace=TRUE)
     c.prefs <- sapply(1:ncol(c.prefs), function(z) c(c.prefs[1:thre.c[z],z], rep(NA,nrow(c.prefs)-thre.c[z])) )
+    colnames(c.prefs) <- c.names
+    rownames(c.prefs) <- NULL
   }
   
+  
+  #print('Section 2a Drop missings')
+  #print(Sys.time())  
+  ## drop columns that contain only missings
+  drop <- which( apply(s.prefs, 2, function(z) all(is.na(z))))
+  if( length(drop)>0 ){
+    s.prefs <- matrix(s.prefs[,-drop], nrow=nrow(s.prefs))
+    colnames(s.prefs) <- s.names[-drop]
+    print(paste("Dropped s.prefs column(s):", paste(s.names[drop], collapse=", ")))
+  }
+  drop <- which( apply(c.prefs, 2, function(z) all(is.na(z))))
+  if( length(drop)>0 ){
+    c.prefs <- matrix(c.prefs[,-drop], nrow=nrow(c.prefs))
+    colnames(c.prefs) <- c.names[-drop]
+    #stop(paste("Need to drop c.prefs column(s):", paste(drop, collapse=", ")))
+    print(paste("Dropped c.prefs column(s):", paste(c.names[drop], collapse=", ")))
+  }
+  
+  
+  #print('Section 2a First match with identifiers')
+  #print(Sys.time())
+  ## ---------------------------------------------------
+  ## --- ???. Replace college/student names with ids ---
+  
+  s.prefs_named <- s.prefs
+  c.prefs_named <- c.prefs
+  
+  # Replace names with IDs
+  s.names <- 1:ncol(s.prefs)
+  names(s.names) <- colnames(s.prefs)
+  c.names <- 1:ncol(c.prefs)
+  names(c.names) <- colnames(c.prefs)
+  
+  s.prefs <- apply(s.prefs, 2, function(pref){
+    c.names[pref]
+  })
+  
+  c.prefs <- apply(c.prefs, 2, function(pref){
+    s.names[pref]
+  })
+  
+  dimnames(s.prefs) <- NULL
+  dimnames(c.prefs) <- NULL
+
+  
+  #print('Section 2a Make consistent')
+  #print(Sys.time())
   ## make preference lists consistent (include only mutual preferences)
-  c.prefs <- sapply(1:ncol(c.prefs), function(z){
-    x <- na.omit(c.prefs[,z])
+  c.prefs <- sapply(c.names, function(z){
+    x <- c(na.omit(c.prefs[,z]))
     y <- sapply(x, function(i) z %in% s.prefs[,i])
     return( c(x[y], rep(NA,nrow(c.prefs)-length(x[y]))) )
   })
-  s.prefs <- sapply(1:ncol(s.prefs), function(z){
-    x <- na.omit(s.prefs[,z])
+  s.prefs <- sapply(s.names, function(z){
+    x <- c(na.omit(s.prefs[,z]))
     y <- sapply(x, function(i) z %in% c.prefs[,i])
     return( c(x[y], rep(NA,nrow(s.prefs)-length(x[y]))) )
   })
   
-  ## consistency checks
-  drop <- which( apply(s.prefs, 2, function(z) sum(!is.na(z))) == 0)
+  #('Section 2a Drop missings')
+  #print(Sys.time())
+  ## consistency checks: drop columns that contain only missings
+  drop <- which( apply(s.prefs, 2, function(z) all(is.na(z))))
   if( length(drop)>0 ){
-    stop(paste("Need to drop s.prefs column(s):", paste(drop, collapse=", ")))
+    s.prefs <- matrix(s.prefs[,-drop], nrow=nrow(s.prefs))
+    colnames(s.prefs) <- s.names[-drop]
+    #stop(paste("Need to drop s.prefs column(s):", paste(drop, collapse=", ")))
+    print(paste("Dropped s.prefs column(s):", paste(s.names[drop], collapse=", ")))
   }
-  drop <- which( apply(c.prefs, 2, function(z) sum(!is.na(z))) == 0)
+  drop <- which( apply(c.prefs, 2, function(z) all(is.na(z))))
   if( length(drop)>0 ){
-    stop(paste("Need to drop c.prefs column(s):", paste(drop, collapse=", ")))
+    c.prefs <- matrix(c.prefs[,-drop], nrow=nrow(c.prefs))
+    colnames(c.prefs) <- c.names[-drop]
+    #stop(paste("Need to drop c.prefs column(s):", paste(drop, collapse=", ")))
+    print(paste("Dropped c.prefs column(s):", paste(c.names[drop], collapse=", ")))
   }
   
+  
+  ## Check if a second match with new identifiers is necessary
+  second_match <- FALSE
+  if(ncol(s.prefs) != ncol(s.prefs_named) || ncol(c.prefs) != ncol(c.prefs_named)) {
+    second_match <- TRUE
+  }
+  
+  if(second_match){
+    #print('Section Second match')
+    #print(Sys.time())
+    ## --------------------------------------------------------
+    ## --- ??? Replace college/student names with ids again ---
+    
+    s.prefs_named2 <- s.prefs
+    c.prefs_named2 <- c.prefs
+    
+    # Replace names with IDs
+    s.names2 <- 1:ncol(s.prefs)
+    names(s.names2) <- colnames(s.prefs)
+    c.names2 <- 1:ncol(c.prefs)
+    names(c.names2) <- colnames(c.prefs)
+    
+    s.prefs <- apply(s.prefs, 2, function(pref){
+      c.names2[as.character(pref)]
+    })
+    
+    c.prefs <- apply(c.prefs, 2, function(pref){
+      s.names2[as.character(pref)]
+    })
+    
+    dimnames(s.prefs) <- NULL
+    dimnames(c.prefs) <- NULL
+  }
+  
+  ###############################################################  
+  #print('Section 3')
+  #print(Sys.time())
   ## -------------------------------------------------------
   ## --- 3. Prepare preference matrices and apply solver ---
   
@@ -196,8 +341,8 @@ hri.default <- function(nStudents=ncol(s.prefs), nColleges=ncol(c.prefs), nSlots
   if(sum(nSlots) != length(nSlots)){ # hospital-residents problem
     
     ## set aside preferences for hospital residents instance (to be returned below)
-    s.prefs.hri <- s.prefs
-    c.prefs.hri <- c.prefs
+    #s.prefs.hri <- s.prefs
+    #c.prefs.hri <- c.prefs
     
     ## apply the transformation
     sm <- c2m(s.prefs, c.prefs, nSlots)
@@ -209,8 +354,8 @@ hri.default <- function(nStudents=ncol(s.prefs), nColleges=ncol(c.prefs), nSlots
   
   ## prepare and write preference matrices
   c.matrix <- sapply(1:nrow(t(c.prefs)), function(z) paste(t(c.prefs)[z,][!is.na(t(c.prefs)[z,])],collapse=" "))
-  s.prefs2 <- s.prefs + ncol(s.prefs)
-  s.matrix <- sapply(1:nrow(t(s.prefs2)), function(z) paste(t(s.prefs2)[z,][!is.na(t(s.prefs2)[z,])],collapse=" "))
+  s.prefs1 <- s.prefs + ncol(s.prefs)
+  s.matrix <- sapply(1:nrow(t(s.prefs1)), function(z) paste(t(s.prefs1)[z,][!is.na(t(s.prefs1)[z,])],collapse=" "))
   instance <- paste( c(length(s.matrix)+length(c.matrix),s.matrix,c.matrix), collapse="n" )
   
   ## call java jar file with choco solver
@@ -224,6 +369,10 @@ hri.default <- function(nStudents=ncol(s.prefs), nColleges=ncol(c.prefs), nSlots
   names(out) <- c("matching","student","college")
   out$college <- out$college - ncol(s.prefs)
   
+  
+  ###############################################################
+  #print('Section 4')
+  #print(Sys.time())
   ## -----------------------------------------------------------------
   ## --- 4. Identify student-optimal and college-optimal matchings ---
   
@@ -242,24 +391,63 @@ hri.default <- function(nStudents=ncol(s.prefs), nColleges=ncol(c.prefs), nSlots
   out <- with(out, data.frame(out, sOptimal=0, cOptimal=0))
   out$sOptimal[out$matching==sopt.id] <- 1
   out$cOptimal[out$matching==copt.id] <- 1
-
+  
   ## add student/college ranking (sRank, cRank)
   out <- cbind(out, do.call("rbind",A)[,c("sRank","cRank")])
   
+  ###############################################################
+  #print('Section 5')
+  #print(Sys.time())
   ## ----------------------------------------------------------
   ## --- 5. For hospital-residents problem: add college ids ---
   
   if(sum(nSlots) != length(nSlots)){ # hospital-residents problem
     out <- merge(x=out, y=collegeSlots, by.x="college", by.y="slots")
-    out <- with(out, data.frame(matching=matching, college=colleges, slots=college, 
+    
+    if(second_match){
+      # Reverse second ids
+      out$student <- colnames(s.prefs_named2)[out$student]
+      out$colleges <- colnames(c.prefs_named2)[out$colleges]
+    }
+    
+    # Reverse first ids
+    out$student <- colnames(s.prefs_named)[out$student]
+    out$colleges <- colnames(c.prefs_named)[out$colleges]
+    
+    out <- with(out, data.frame(matching=matching, college=colleges, slots=college,
                                 student=student, sOptimal=sOptimal, cOptimal=cOptimal,
-                                sRank=sRank, cRank=cRank))
-  } else{
+                                sRank=sRank, cRank=cRank, stringsAsFactors=FALSE))
+    
+  } else {   # stable-marriage problem
+    
+    if(second_match){
+      # Reverse second ids
+      out$student <- colnames(s.prefs_named2)[out$student]
+      out$college <- colnames(c.prefs_named2)[out$college] 
+    }
+    
+    # Reverse first ids
+    out$student <- colnames(s.prefs_named)[out$student]
+    out$college <- colnames(c.prefs_named)[out$college]
+    
     out <- with(out, data.frame(matching=matching, college=college, slots=college,
                                 student=student, sOptimal=sOptimal, cOptimal=cOptimal,
-                                sRank=sRank, cRank=cRank))
-  }
+                                sRank=sRank, cRank=cRank, stringsAsFactors=FALSE))
+    }
   
+  # if(sum(nSlots) != length(nSlots)){ # hospital-residents problem
+  #   out <- with(out, data.frame(matching=matching, college=colleges, slots=college,
+  #                               student=student, sOptimal=sOptimal, cOptimal=cOptimal,
+  #                               sRank=sRank, cRank=cRank))
+  # } else{
+  #   out <- with(out, data.frame(matching=matching, college=college, slots=college,
+  #                               student=student, sOptimal=sOptimal, cOptimal=cOptimal,
+  #                               sRank=sRank, cRank=cRank))
+  # }
+
+  ###############################################################
+  #print('Section 6')
+  #print(Sys.time())
   ## ----------------------------------
   ## --- 6. Sort and return results ---
   
@@ -269,16 +457,63 @@ hri.default <- function(nStudents=ncol(s.prefs), nColleges=ncol(c.prefs), nSlots
   
   ## return results
   if(sum(nSlots) != length(nSlots)){ # hospital-residents problem
-    res <- list(s.prefs.smi = s.prefs[rowSums(is.na(s.prefs))<ncol(s.prefs),], 
-                c.prefs.smi = c.prefs[rowSums(is.na(c.prefs))<ncol(c.prefs),], 
-                s.prefs.hri = s.prefs.hri[rowSums(is.na(s.prefs.hri))<ncol(s.prefs.hri),],
-                c.prefs.hri = c.prefs.hri[rowSums(is.na(c.prefs.hri))<ncol(c.prefs.hri),], 
-                matchings = out)
-  } else{ # stable-marriage problem
-    res <- list(s.prefs.smi = s.prefs[rowSums(is.na(s.prefs))<ncol(s.prefs),], 
-                c.prefs.smi = c.prefs[rowSums(is.na(c.prefs))<ncol(c.prefs),], 
-                matchings = out)
+    res <- list(
+      
+      #s.prefs.smi = s.prefs[rowSums(is.na(s.prefs))<ncol(s.prefs),], 
+      #c.prefs.smi = c.prefs[rowSums(is.na(c.prefs))<ncol(c.prefs),], 
+      
+      s.prefs.hri = if(second_match) {
+        
+        s.prefs_named2[rowSums(is.na(s.prefs_named))<ncol(s.prefs_named),]
+        
+        } else {
+          
+          s.prefs_named[rowSums(is.na(s.prefs_named))<ncol(s.prefs_named),]
+          
+          },
+      
+      c.prefs.hri = if(second_match) {
+        
+        c.prefs_named2[rowSums(is.na(c.prefs_named))<ncol(c.prefs_named),]
+        
+        } else {
+          
+          c.prefs_named[rowSums(is.na(c.prefs_named))<ncol(c.prefs_named),]
+          
+          },
+      
+      matchings = out
+      
+      )
+    
+  } else { # stable-marriage problem
+    
+    res <- list( s.prefs.smi = if(second_match) {
+      
+      s.prefs_named2[rowSums(is.na(s.prefs))<ncol(s.prefs),]
+      
+      } else {
+        
+        s.prefs_named[rowSums(is.na(s.prefs))<ncol(s.prefs),]
+        
+        },
+                 
+      c.prefs.smi = if(second_match) {
+        
+        c.prefs_named2[rowSums(is.na(c.prefs))<ncol(c.prefs),]
+        
+        }  else {
+          
+          c.prefs_named[rowSums(is.na(c.prefs))<ncol(c.prefs),]
+          
+          },
+                
+      matchings = out
+      
+      )
   }
+  #print('Section return')
+  #print(Sys.time())
   #res$call <- match.call()
   class(res) <- "hri"
   return(res)
@@ -341,6 +576,7 @@ plot.hri <- function(x, energy=FALSE, ...){
   x$energy <- with(x, sSatisf*cSatisf)
   
   ## aggregate by matching
+  x <- x[,-which(names(x) %in% c("college","slots","student"))]  
   x <- aggregate(x, by=list(x$matching), sum)
   x$csSatisf <- with(x, sSatisf - cSatisf)
   
@@ -370,7 +606,7 @@ plot.hri <- function(x, energy=FALSE, ...){
     with(x, points(energy ~ csSatisf, data=x[sOptimal>0,], col="black"))
     with(x, points(energy ~ csSatisf, data=x[cOptimal>0,], pch=16, col="white"))
     with(x, points(energy ~ csSatisf, data=x[cOptimal>0,], col="black"))
-
+    
   } else{
     
     with(x, plot(cSatisf ~ sSatisf, col="gray80", type="l", 
@@ -396,6 +632,3 @@ plot.hri <- function(x, energy=FALSE, ...){
   par(mar=c(5.1, 4.1, 4.1, 2.1)) 
   
 }
-
-
-
